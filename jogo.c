@@ -169,6 +169,7 @@ void criar_montanhas() {
     }
 }
 
+// ToDo lembrar de matar as threads abertas caso o jogo acabe
 int main(){
     int coluna = 5;
     int linha  = 3;
