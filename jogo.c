@@ -7,24 +7,13 @@
 
 int x;
 
+int total_segundos_jogo = 5;
+
 int nave_x;
 int nave_y;
 
 int missel_x;
 int missel_y;
-
-void detecta_colisao() {
-
-    static const int hitbox_nave = 10
-
-    if (missel_x > (nave_x - hitbox_nave) &&
-        missel_x < (nave_x + hitbox_nave) &&
-        missel_y > (nave_y - hitbox_nave) &&
-        missel_y < (nave_y + hitbox_nave)
-        ){
-            //ToDo sumir missel e nave e explodir
-        }
-}
 
 //Função gotoxy
 void gotoxy(int x, int y)
@@ -130,12 +119,41 @@ void canhao(int x, int y){
 	gotoxy(x, y+3);
 	printf("+-+");
 	}
+
+void detecta_colisao() {
+
+    static const int hitbox_nave = 10;
+
+    if (missel_x > (nave_x - hitbox_nave) &&
+        missel_x < (nave_x + hitbox_nave) &&
+        missel_y > (nave_y - hitbox_nave) &&
+        missel_y < (nave_y + hitbox_nave)
+        ){
+            //ToDo sumir missel e nave e explodir
+        }
+}
+
+DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
+    while (total_segundos_jogo > 0){
+        total_segundos_jogo--;
+        Sleep(1000);
+    }
+    ExitThread(0);
+}
+
 int main(){
     char montanhas[] = {10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24,10, 17, 14, 18, 16, 19,12,18, 13, 24};
     int coluna = 5;
     int linha  = 3;
     int k=0;
     system("cls");
+
+    HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
+
+    if (handle_timer_do_jogo == NULL) { // se falhar na criacao da thread
+        return 420;
+    }
+
     for (int i = 0; i<18; ){
         //printf("aqui");
         for (int j=montanhas[i]; j<=montanhas[i+1]; j++){
@@ -163,6 +181,10 @@ int main(){
     bomba_horizontal(43, 22);
     bomba_horizontal(43, 21);
 	while(1){
+        if(total_segundos_jogo <= 0) {
+            return 0;
+        }
+
         linha = 2 + (rand() % 5);
         for (int x=79; x >=0; x--){
             nave(x,linha);	Sleep(40);
