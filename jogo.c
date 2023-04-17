@@ -170,6 +170,7 @@ void criar_montanhas() {
 }
 
 // ToDo lembrar de matar as threads abertas caso o jogo acabe
+// ToDo funcao gotoxy precisa de cuidado para ser manipulada por 2 threads se nao buga a impressao (acho q veremos novos conceitos ainda)
 int main(){
     int coluna = 5;
     int linha  = 3;
