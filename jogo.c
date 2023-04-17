@@ -141,18 +141,16 @@ DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
     ExitThread(0);
 }
 
-int main(){
-    char montanhas[] = {10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24,10, 17, 14, 18, 16, 19,12,18, 13, 24};
-    int coluna = 5;
-    int linha  = 3;
-    int k=0;
-    system("cls");
+// pode estar em outra thread mas acho que nao precisa
+void criar_montanhas() {
+    static char montanhas[] = {
+        10, 17, 14, 18, 16, 19, 12, 18, 13, 24,
+        10, 17, 14, 18, 16, 19, 12, 18, 13, 24,
+        10, 17, 14, 18, 16, 19, 12, 18, 13, 24,
+        10, 17, 14, 18, 16, 19, 12, 18, 13, 24
+    };
 
-    HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
-
-    if (handle_timer_do_jogo == NULL) { // se falhar na criacao da thread
-        return 420;
-    }
+    int k = 0;
 
     for (int i = 0; i<18; ){
         //printf("aqui");
@@ -169,6 +167,22 @@ int main(){
         }
         i++;
     }
+}
+
+int main(){
+    int coluna = 5;
+    int linha  = 3;
+    int k=0;
+    system("cls");
+
+    HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
+
+    if (handle_timer_do_jogo == NULL) { // se falhar na criacao da thread
+        return 420;
+    }
+
+    criar_montanhas();
+
   	// Providing a seed value
     srand(time(NULL));
     k=21;
