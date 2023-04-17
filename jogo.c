@@ -7,6 +7,24 @@
 
 int x;
 
+int nave_x;
+int nave_y;
+
+int missel_x;
+int missel_y;
+
+void detecta_colisao() {
+
+    static const int hitbox_nave = 10
+
+    if (missel_x > (nave_x - hitbox_nave) &&
+        missel_x < (nave_x + hitbox_nave) &&
+        missel_y > (nave_y - hitbox_nave) &&
+        missel_y < (nave_y + hitbox_nave)
+        ){
+            //ToDo sumir missel e nave e explodir
+        }
+}
 
 //Função gotoxy
 void gotoxy(int x, int y)
