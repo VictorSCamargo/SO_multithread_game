@@ -113,54 +113,54 @@ void canhao(int x, int y){
 	printf("+-+");
 	}
 int main(){
-  char montanhas[] = {10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24,10, 17, 14, 18, 16, 19,12,18, 13, 24};
-  int coluna = 5;
-  int linha  = 3;
-  int k=0;
-  system("cls");
-  for (int i = 0; i<18; ){
-  	//printf("aqui");
-  	for (int j=montanhas[i]; j<=montanhas[i+1]; j++){
-  		gotoxy(k, j);//printf("%i %i\n", k, j);//
-  		printf("\\");
-  		k++;
-	  }
-	  
-	for (int j=montanhas[i]; j>=montanhas[i+1]; j--){
-  		gotoxy(k, j);//printf("%i %i\n", k, j);//
-  		printf("/");
-  		k++;
-	  }
-	  i++;  	
-  }
+    char montanhas[] = {10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24, 10, 17, 14, 18, 16, 19,12,18, 13, 24,10, 17, 14, 18, 16, 19,12,18, 13, 24};
+    int coluna = 5;
+    int linha  = 3;
+    int k=0;
+    system("cls");
+    for (int i = 0; i<18; ){
+        //printf("aqui");
+        for (int j=montanhas[i]; j<=montanhas[i+1]; j++){
+            gotoxy(k, j);//printf("%i %i\n", k, j);//
+            printf("\\");
+            k++;
+        }
+
+        for (int j=montanhas[i]; j>=montanhas[i+1]; j--){
+            gotoxy(k, j);//printf("%i %i\n", k, j);//
+            printf("/");
+            k++;
+        }
+        i++;
+    }
   	// Providing a seed value
-srand(time(NULL)); 
-k=21;
-	
-	canhao(40, 23);
-	bomba_horizontal(43, 26);
-	bomba_horizontal(43, 25);
-	bomba_horizontal(43, 24);
-	bomba_horizontal(43, 23);
-	bomba_horizontal(43, 22);
-	bomba_horizontal(43, 21);
+    srand(time(NULL));
+    k=21;
+
+    canhao(40, 23);
+    bomba_horizontal(43, 26);
+    bomba_horizontal(43, 25);
+    bomba_horizontal(43, 24);
+    bomba_horizontal(43, 23);
+    bomba_horizontal(43, 22);
+    bomba_horizontal(43, 21);
 	while(1){
- linha = 2 + (rand() % 5);
-  for (int x=79; x >=0; x--){
-  	nave(x,linha);	Sleep(40);
-  	apaga_nave(x,linha);
-  }
-  apaga_bomba_horizontal(43, k);
-  for (int y=20; y >=5; y--){
-  	bomba(40,y);	Sleep(40);
-  	apaga_bomba(40,y);
-  }
-  explode_bomba(40, 7);
-  k++;
-  if (k==26){
-  	bomba_horizontal(43, 26);
-  }
-}
-  getche(); 
+        linha = 2 + (rand() % 5);
+        for (int x=79; x >=0; x--){
+            nave(x,linha);	Sleep(40);
+            apaga_nave(x,linha);
+        }
+        apaga_bomba_horizontal(43, k);
+        for (int y=20; y >=5; y--){
+            bomba(40,y);	Sleep(40);
+            apaga_bomba(40,y);
+        }
+        explode_bomba(40, 7);
+        k++;
+        if (k==26){
+            bomba_horizontal(43, 26);
+        }
+    }
+    getche();
 }
 
