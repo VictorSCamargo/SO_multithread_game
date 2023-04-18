@@ -4,8 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-
-int x;
+HANDLE semaforo;
 
 int total_segundos_jogo = 5;
 
@@ -169,6 +168,17 @@ void criar_montanhas() {
     }
 }
 
+
+DWORD WINAPI movimento_missel(LPVOID lpParameter) {
+    WaitForSingleObject(semaforo, INFINITE);
+    ReleaseSemaphore(semaforo, 1, NULL);
+}
+DWORD WINAPI movimento_nave(LPVOID lpParameter) {
+    WaitForSingleObject(semaforo, INFINITE);
+    ReleaseSemaphore(semaforo, 1, NULL);
+}
+
+
 // ToDo lembrar de matar as threads abertas caso o jogo acabe
 // ToDo funcao gotoxy precisa de cuidado para ser manipulada por 2 threads se nao buga a impressao (acho q veremos novos conceitos ainda)
 int main(){
@@ -178,8 +188,17 @@ int main(){
     system("cls");
 
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
+    HANDLE handle_movimento_missel = CreateThread(NULL, 0, movimento_missel, NULL, 0, NULL);
+    HANDLE handle_movimento_nave = CreateThread(NULL, 0, movimento_nave, NULL, 0, NULL);
 
-    if (handle_timer_do_jogo == NULL) { // se falhar na criacao da thread
+    semaforo = CreateSemaphore(NULL, 1, 1, NULL);
+
+    // se falhar a criacao de algo
+    if (handle_timer_do_jogo == NULL ||
+        semaforo == NULL ||
+        handle_movimento_missel == NULL ||
+        handle_movimento_nave == NULL
+        ) {
         return 420;
     }
 
