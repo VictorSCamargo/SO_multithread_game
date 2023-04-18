@@ -170,12 +170,39 @@ void criar_montanhas() {
 
 
 DWORD WINAPI movimento_missel(LPVOID lpParameter) {
-    WaitForSingleObject(semaforo, INFINITE);
-    ReleaseSemaphore(semaforo, 1, NULL);
+    while(1){
+
+        for (int y=20; y >=5; y--){
+            WaitForSingleObject(semaforo, INFINITE);
+            bomba(40,y);
+            ReleaseSemaphore(semaforo, 1, NULL);
+
+            Sleep(40);
+
+            WaitForSingleObject(semaforo, INFINITE);
+            apaga_bomba(40,y);
+            ReleaseSemaphore(semaforo, 1, NULL);
+        }
+    }
 }
+
 DWORD WINAPI movimento_nave(LPVOID lpParameter) {
-    WaitForSingleObject(semaforo, INFINITE);
-    ReleaseSemaphore(semaforo, 1, NULL);
+    int linha;
+    while(1){
+
+        linha = 2 + (rand() % 5);
+        for (int x=79; x >=0; x--){
+            WaitForSingleObject(semaforo, INFINITE);
+            nave(x,linha);
+            ReleaseSemaphore(semaforo, 1, NULL);
+
+            Sleep(40);
+
+            WaitForSingleObject(semaforo, INFINITE);
+            apaga_nave(x,linha);
+            ReleaseSemaphore(semaforo, 1, NULL);
+        }
+    }
 }
 
 
@@ -186,6 +213,20 @@ int main(){
     int linha  = 3;
     int k=0;
     system("cls");
+
+    criar_montanhas();
+
+  	// Providing a seed value
+    srand(time(NULL));
+    k=21;
+
+    canhao(40, 23);
+    bomba_horizontal(43, 26);
+    bomba_horizontal(43, 25);
+    bomba_horizontal(43, 24);
+    bomba_horizontal(43, 23);
+    bomba_horizontal(43, 22);
+    bomba_horizontal(43, 21);
 
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
     HANDLE handle_movimento_missel = CreateThread(NULL, 0, movimento_missel, NULL, 0, NULL);
@@ -202,36 +243,18 @@ int main(){
         return 420;
     }
 
-    criar_montanhas();
-
-  	// Providing a seed value
-    srand(time(NULL));
-    k=21;
-
-    canhao(40, 23);
-    bomba_horizontal(43, 26);
-    bomba_horizontal(43, 25);
-    bomba_horizontal(43, 24);
-    bomba_horizontal(43, 23);
-    bomba_horizontal(43, 22);
-    bomba_horizontal(43, 21);
 	while(1){
         if(total_segundos_jogo <= 0) {
+            CloseHandle(handle_movimento_missel);
+            CloseHandle(handle_movimento_nave);
+            CloseHandle(semaforo);
             return 0;
         }
 
-        linha = 2 + (rand() % 5);
-        for (int x=79; x >=0; x--){
-            nave(x,linha);	Sleep(40);
-            apaga_nave(x,linha);
-        }
-        apaga_bomba_horizontal(43, k);
-        for (int y=20; y >=5; y--){
-            bomba(40,y);	Sleep(40);
-            apaga_bomba(40,y);
-        }
-        explode_bomba(40, 7);
-        k++;
+        //apaga_bomba_horizontal(43, k);
+
+        //explode_bomba(40, 7);
+        //k++;
         if (k==26){
             bomba_horizontal(43, 26);
         }
