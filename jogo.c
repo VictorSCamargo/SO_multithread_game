@@ -4,15 +4,34 @@
 #include <time.h>
 #include <stdlib.h>
 
-HANDLE semaforo;
+// ToDos
+// Detectar colisao entre nave e missil, apagar ambos objetos e gerar explosao
+// Detectar input do usuario para disparar missil
+// Recarregar missil sincronamente caso nao estoque nao esteja cheio (lembrar de desenhar ele na tela)
+// Apagar missel conforme ele é utilizado
+// Acabar jogo ao eliminar 20 naves
+// (revisar se nao falta algo no moodle)
+
+// Feitos
+// Movimento da nave
+// Movimento do missil
+// Timer de tempo maximo do jogo
+// Variavel para alterar dificuldade (que muda a velocidade das naves)
+
+int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
 
 int total_segundos_jogo = 5;
+int acabou_jogo = 0;    //false
 
 int nave_x;
 int nave_y;
 
 int missel_x;
 int missel_y;
+
+int delay_deslocamento_nave; //default
+
+HANDLE semaforo_goto;
 
 //Função gotoxy
 void gotoxy(int x, int y)
@@ -119,26 +138,6 @@ void canhao(int x, int y){
 	printf("+-+");
 	}
 
-void detecta_colisao() {
-
-    static const int hitbox_nave = 10;
-
-    if (missel_x > (nave_x - hitbox_nave) &&
-        missel_x < (nave_x + hitbox_nave) &&
-        missel_y > (nave_y - hitbox_nave) &&
-        missel_y < (nave_y + hitbox_nave)
-        ){
-            //ToDo sumir missel e nave e explodir
-        }
-}
-
-DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
-    while (total_segundos_jogo > 0){
-        total_segundos_jogo--;
-        Sleep(1000);
-    }
-    ExitThread(0);
-}
 
 // pode estar em outra thread mas acho que nao precisa
 void criar_montanhas() {
@@ -168,46 +167,81 @@ void criar_montanhas() {
     }
 }
 
+DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
+
+    static const int hitbox_nave = 10;
+
+    while (!acabou_jogo){
+        Sleep(100);
+        if (missel_x > (nave_x - hitbox_nave) &&
+            missel_x < (nave_x + hitbox_nave) &&
+            missel_y > (nave_y - hitbox_nave) &&
+            missel_y < (nave_y + hitbox_nave)
+        ){
+            //ToDo sumir missel e nave e explodir
+
+        }
+    }
+    ExitThread(0);
+}
+
+DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
+    while (!acabou_jogo){
+        if(total_segundos_jogo > 0) {
+            total_segundos_jogo--;
+            Sleep(1000);
+        }
+        else {
+            acabou_jogo = 1;
+        }
+    }
+    ExitThread(0);
+}
 
 DWORD WINAPI movimento_missel(LPVOID lpParameter) {
-    while(1){
+    while(!acabou_jogo){
 
-        for (int y=20; y >=5; y--){
-            WaitForSingleObject(semaforo, INFINITE);
+        for (int y=20; y >=2; y--){
+            WaitForSingleObject(semaforo_goto, INFINITE);
             bomba(40,y);
-            ReleaseSemaphore(semaforo, 1, NULL);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
 
             Sleep(40);
 
-            WaitForSingleObject(semaforo, INFINITE);
+            WaitForSingleObject(semaforo_goto, INFINITE);
             apaga_bomba(40,y);
-            ReleaseSemaphore(semaforo, 1, NULL);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
     }
+    ExitThread(0);
 }
 
 DWORD WINAPI movimento_nave(LPVOID lpParameter) {
     int linha;
-    while(1){
+    while(!acabou_jogo){
 
         linha = 2 + (rand() % 5);
         for (int x=79; x >=0; x--){
-            WaitForSingleObject(semaforo, INFINITE);
+            WaitForSingleObject(semaforo_goto, INFINITE);
             nave(x,linha);
-            ReleaseSemaphore(semaforo, 1, NULL);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
 
-            Sleep(40);
+            Sleep(delay_deslocamento_nave);
 
-            WaitForSingleObject(semaforo, INFINITE);
+            WaitForSingleObject(semaforo_goto, INFINITE);
             apaga_nave(x,linha);
-            ReleaseSemaphore(semaforo, 1, NULL);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
     }
+    ExitThread(0);
 }
 
+DWORD WINAPI interpreta_input(LPVOID lpParameter) {
+    //getche();   // ToDo pegar input
+}
 
 // ToDo lembrar de matar as threads abertas caso o jogo acabe
-// ToDo funcao gotoxy precisa de cuidado para ser manipulada por 2 threads se nao buga a impressao (acho q veremos novos conceitos ainda)
+// ToDo funcao gotoxy precisa de cuidado para ser manipulada por 2 threads se nao buga a impressao
 int main(){
     int coluna = 5;
     int linha  = 3;
@@ -215,6 +249,21 @@ int main(){
     system("cls");
 
     criar_montanhas();
+
+    switch(dificuldade){
+        case 0:
+            delay_deslocamento_nave = 50;
+            break;
+        case 1:
+            delay_deslocamento_nave = 30;
+            break;
+        case 2:
+            delay_deslocamento_nave = 10;
+            break;
+        default:
+            delay_deslocamento_nave = 30;
+            break;
+    }
 
   	// Providing a seed value
     srand(time(NULL));
@@ -232,11 +281,11 @@ int main(){
     HANDLE handle_movimento_missel = CreateThread(NULL, 0, movimento_missel, NULL, 0, NULL);
     HANDLE handle_movimento_nave = CreateThread(NULL, 0, movimento_nave, NULL, 0, NULL);
 
-    semaforo = CreateSemaphore(NULL, 1, 1, NULL);
+    semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
 
     // se falhar a criacao de algo
     if (handle_timer_do_jogo == NULL ||
-        semaforo == NULL ||
+        semaforo_goto == NULL ||
         handle_movimento_missel == NULL ||
         handle_movimento_nave == NULL
         ) {
@@ -244,21 +293,11 @@ int main(){
     }
 
 	while(1){
-        if(total_segundos_jogo <= 0) {
-            CloseHandle(handle_movimento_missel);
-            CloseHandle(handle_movimento_nave);
-            CloseHandle(semaforo);
+        Sleep(100);
+        if(acabou_jogo) {
+            CloseHandle(semaforo_goto);
             return 0;
         }
-
-        //apaga_bomba_horizontal(43, k);
-
-        //explode_bomba(40, 7);
-        //k++;
-        if (k==26){
-            bomba_horizontal(43, 26);
-        }
     }
-    getche();
 }
 
