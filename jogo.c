@@ -248,8 +248,8 @@ int main(){
     int k=0;
     system("cls");
 
-    printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
-    scanf("%d", &dificuldade);
+    //printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
+    //scanf("%d", &dificuldade);
 
     switch(dificuldade){
         case 0:
