@@ -41,6 +41,9 @@ int destruir_nave = 0;
 
 int disparar_missil = 0;
 
+//maximo de naves que podem ser destruidas
+const int max_naves_destruidas = 20;
+
 HANDLE semaforo_goto;
 HANDLE semaforo_missil_disparado;
 
@@ -182,9 +185,15 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
 
     static const int hitbox_nave_x = 4;
     static const int hitbox_nave_y = 2;
+    static int naves_destruidas = 0;
 
     while (!acabou_jogo){
         Sleep(10); // delay para nao checar tanto
+
+        //verificacao para ver se o numero max de naves foram destruidas
+        if (naves_destruidas == max_naves_destruidas){
+            acabou_jogo = 1;
+        }
 
         // se posicao de missil e nave (com hitbox maior) estiverem batendo
         if ((missil_x >= (nave_x - hitbox_nave_x)) &&
@@ -203,6 +212,9 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
             ReleaseSemaphore(semaforo_goto, 1, NULL);
 
             Sleep(cooldown_respawn_nave_minimo);
+
+            naves_destruidas = naves_destruidas + 1;
+
         }
     }
     ExitThread(0);
@@ -263,7 +275,7 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
                 destruir_nave = 0;
                 break;
             }
-            
+
             WaitForSingleObject(semaforo_goto, INFINITE);
             nave(nave_x,nave_y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
@@ -359,6 +371,11 @@ int main(){
         if(acabou_jogo) {
             CloseHandle(semaforo_goto);
             CloseHandle(semaforo_missil_disparado);
+
+            system("cls");
+
+            printf("Jogo finalizado!");
+
             return 0;
         }
     }
