@@ -5,18 +5,20 @@
 #include <stdlib.h>
 
 // ToDos
-// Detectar colisao entre nave e missil, apagar ambos objetos e gerar explosao
-// Detectar input do usuario para disparar missil
-// Recarregar missil sincronamente caso nao estoque nao esteja cheio (lembrar de desenhar ele na tela)
-// Apagar missil conforme ele � utilizado
+// Recarregar missil sincronamente caso estoque nao esteja cheio (lembrar de desenhar ele na tela)
+// Apagar missil conforme ele eh utilizado
 // Acabar jogo ao eliminar 20 naves
+// Impedir disparo do missil se n tiver municao
 // (revisar se nao falta algo no moodle)
 
 // Feitos
+// Detectar input do usuario para disparar missil
 // Movimento da nave
 // Movimento do missil
 // Timer de tempo maximo do jogo
 // Variavel para alterar dificuldade (que muda a velocidade das naves)
+// Detectar colisao entre nave e missil, apagar ambos objetos e gerar explosao
+
 
 int cooldown_respawn_nave_minimo = 2000;
 
@@ -37,8 +39,10 @@ int delay_deslocamento_nave;
 int destruir_missil = 0;
 int destruir_nave = 0;
 
-HANDLE semaforo_goto;
+int disparar_missil = 0;
 
+HANDLE semaforo_goto;
+HANDLE semaforo_missil_disparado;
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -222,7 +226,7 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
 
     while(!acabou_jogo){
 
-        Sleep(1000);
+        while(disparar_missil == 0);
 
         for (missil_y = y_inicial_missil; missil_y >=2; missil_y--){
             if(destruir_missil) {
@@ -241,6 +245,7 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
             ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
         missil_y = y_inicial_missil;
+        disparar_missil = 0;
     }
     ExitThread(0);
 }
@@ -275,7 +280,14 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
 }
 
 DWORD WINAPI interpreta_input(LPVOID lpParameter) {
-    //getche();   // ToDo pegar input
+    while(!acabou_jogo) {
+        getche();
+        if(disparar_missil == 0){
+            disparar_missil = 1;
+        }
+        Sleep(1000);
+    }
+    ExitThread(0);
 }
 
 // ToDo lembrar de matar as threads abertas caso o jogo acabe
@@ -286,6 +298,7 @@ int main(){
     int k=0;
     system("cls");
 
+    // ToDo tirar ao final
     //printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
     //scanf("%d", &dificuldade);
 
@@ -325,15 +338,18 @@ int main(){
     HANDLE handle_movimento_missil = CreateThread(NULL, 0, movimento_missil, NULL, 0, NULL);
     HANDLE handle_movimento_nave = CreateThread(NULL, 0, movimento_nave, NULL, 0, NULL);
     HANDLE handle_detecta_colisao = CreateThread(NULL, 0, detecta_colisao, NULL, 0, NULL);
+    HANDLE handle_interpreta_input = CreateThread(NULL, 0, interpreta_input, NULL, 0, NULL);
 
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
+    semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
 
     // se falhar a criacao de algo
     if (handle_timer_do_jogo == NULL ||
         semaforo_goto == NULL ||
         handle_movimento_missil == NULL ||
         handle_movimento_nave == NULL ||
-        handle_detecta_colisao == NULL
+        handle_detecta_colisao == NULL ||
+        handle_interpreta_input == NULL
         ) {
         return -420;
     }
