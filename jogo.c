@@ -358,6 +358,7 @@ int main(){
         Sleep(100);
         if(acabou_jogo) {
             CloseHandle(semaforo_goto);
+            CloseHandle(semaforo_missil_disparado);
             return 0;
         }
     }
