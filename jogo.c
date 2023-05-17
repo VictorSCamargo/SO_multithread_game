@@ -248,7 +248,8 @@ int main(){
     int k=0;
     system("cls");
 
-    criar_montanhas();
+    printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
+    scanf("%d", &dificuldade);
 
     switch(dificuldade){
         case 0:
@@ -261,9 +262,14 @@ int main(){
             delay_deslocamento_nave = 10;
             break;
         default:
+            printf("Valor nao reconhecido. Setando dificuldade 'medio'...");
+            Sleep(2500);
             delay_deslocamento_nave = 30;
             break;
     }
+    system("cls"); //clear screen
+
+    criar_montanhas();
 
   	// Providing a seed value
     srand(time(NULL));
@@ -289,7 +295,7 @@ int main(){
         handle_movimento_missel == NULL ||
         handle_movimento_nave == NULL
         ) {
-        return 420;
+        return -420;
     }
 
 	while(1){
