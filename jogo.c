@@ -18,7 +18,7 @@
 // Timer de tempo maximo do jogo
 // Variavel para alterar dificuldade (que muda a velocidade das naves)
 
-int cooldown_respawn_nave_mili = 2000;
+int cooldown_respawn_nave_minimo = 2000;
 
 int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
 
@@ -28,7 +28,7 @@ int acabou_jogo = 0;    //false
 int nave_x;
 int nave_y;
 
-int missil_x = 40;
+int missil_x = 40; // fixo
 int missil_y;
 
 int delay_deslocamento_nave;
@@ -188,12 +188,17 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
             (missil_y >= (nave_y - hitbox_nave_y)) &&
             (missil_y <= (nave_y + hitbox_nave_y))
         ){
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            explode_bomba(missil_x, missil_y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
+            int posicao_explosao_x = missil_x;
+            int posicao_explosao_y = missil_y;
+
             destruir_missil = 1;
             destruir_nave = 1;
-            Sleep(cooldown_respawn_nave_mili);
+
+            WaitForSingleObject(semaforo_goto, INFINITE);
+            explode_bomba(posicao_explosao_x, posicao_explosao_y);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+            Sleep(cooldown_respawn_nave_minimo);
         }
     }
     ExitThread(0);
@@ -245,7 +250,7 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
 
     while(!acabou_jogo){
 
-        Sleep(cooldown_respawn_nave_mili);
+        Sleep(cooldown_respawn_nave_minimo + (rand() % 2000));
 
         nave_y = 2 + (rand() % 5);
         for (nave_x = x_inicial_nave; nave_x >=0; nave_x--){
