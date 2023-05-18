@@ -345,20 +345,20 @@ int main(){
     system("cls");
 
     printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
-    scanf("%d", &dificuldade);
+    char ch = getche();
 
-    switch(dificuldade){
-        case 0:
+    switch(ch){
+        case '0':
             delay_deslocamento_nave = 50;
             break;
-        case 1:
+        case '1':
             delay_deslocamento_nave = 30;
             break;
-        case 2:
+        case '2':
             delay_deslocamento_nave = 15;
             break;
         default:
-            printf("Valor nao reconhecido. Setando dificuldade 'medio'...");
+            printf("\nValor nao reconhecido. Setando dificuldade 'medio'...");
             Sleep(2500);
             delay_deslocamento_nave = 30;
             break;
