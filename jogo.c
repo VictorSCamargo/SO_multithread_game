@@ -26,7 +26,7 @@ int cooldown_respawn_nave_minimo = 2000;
 
 int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
 
-int total_segundos_jogo = 10;
+int total_segundos_jogo = 20;
 int acabou_jogo = 0;    //false
 
 int nave_x;
@@ -196,7 +196,7 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
     static int naves_destruidas = 0;
 
     while (!acabou_jogo){
-        Sleep(10); // delay para nao checar tanto
+        Sleep(50); // delay para nao checar tanto
 
         if (naves_destruidas == max_naves_destruidas){
             acabou_jogo = 1;
@@ -228,7 +228,7 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
 
 DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
     while (!acabou_jogo) {
-        Sleep(5000); // Delay de 2 segundos entre a produção de mísseis
+        Sleep(5000); // Delay entre a produção de mísseis
 
         if (municoes_disponiveis < MAX_MUNICOES) {
             WaitForSingleObject(hMutex, INFINITE);
@@ -241,8 +241,7 @@ DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
         }
 
     }
-
-    return 0;
+    ExitThread(0);
 }
 
 DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
@@ -263,10 +262,12 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
 
     while(!acabou_jogo){
 
-        while(disparar_missil == 0);
+        while(disparar_missil == 0){
+            Sleep(100);
+        }
 
         for (missil_y = y_inicial_missil; missil_y >=2; missil_y--){
-            if(destruir_missil) {
+            if(destruir_missil || acabou_jogo) {
                 destruir_missil = 0;
                 break;
             }
@@ -296,7 +297,7 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
 
         nave_y = 2 + (rand() % 5);
         for (nave_x = x_inicial_nave; nave_x >=0; nave_x--){
-            if(destruir_nave) {
+            if(destruir_nave || acabou_jogo) {
                 destruir_nave = 0;
                 break;
             }
@@ -317,9 +318,12 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
 }
 
 DWORD WINAPI interpreta_input(LPVOID lpParameter) {
+    char ch;
+
     while(!acabou_jogo) {
-        getche();
-        if(disparar_missil == 0){
+        ch = getch(); // pega caractere sem imprimir na tela
+
+        if((disparar_missil == 0) && (ch == ' ')){
             if (municoes_disponiveis > 0) {
                 disparar_missil = 1;
                 WaitForSingleObject(hMutex, INFINITE);
@@ -329,24 +333,17 @@ DWORD WINAPI interpreta_input(LPVOID lpParameter) {
                 municoes_disponiveis--;
                 y_ultimo_missel++;
                 ReleaseMutex(hMutex);
-
             }
-
         }
         Sleep(1000);
     }
     ExitThread(0);
 }
 
-// ToDo lembrar de matar as threads abertas caso o jogo acabe
-// ToDo funcao gotoxy precisa de cuidado para ser manipulada por 2 threads se nao buga a impressao
+
 int main(){
-    int coluna = 5;
-    int linha  = 3;
-    int k=0;
     system("cls");
 
-    // ToDo tirar ao final
     printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
     scanf("%d", &dificuldade);
 
@@ -358,7 +355,7 @@ int main(){
             delay_deslocamento_nave = 30;
             break;
         case 2:
-            delay_deslocamento_nave = 10;
+            delay_deslocamento_nave = 15;
             break;
         default:
             printf("Valor nao reconhecido. Setando dificuldade 'medio'...");
@@ -372,7 +369,6 @@ int main(){
 
   	// Providing a seed value
     srand(time(NULL));
-    k=21;
 
     canhao(40, 23);
     bomba_horizontal(43, 26);
@@ -406,8 +402,9 @@ int main(){
     }
 
 	while(1){
-        Sleep(100);
+        Sleep(100); // para nao consumir tanto processador
         if(acabou_jogo) {
+            // fecha os handles
             CloseHandle(semaforo_goto);
             CloseHandle(semaforo_missil_disparado);
             CloseHandle(hProdutorThread);
@@ -416,9 +413,15 @@ int main(){
             CloseHandle(handle_movimento_nave);
             CloseHandle(handle_detecta_colisao);
             CloseHandle(handle_interpreta_input);
+
+            Sleep(100); // margem para esperar o resto dos processos pararem
+
+            // imprimir jogo finalizado
             system("cls");
+            gotoxy(0, 0);
             printf("Jogo finalizado!");
             Sleep(5000);
+
             return 0;
         }
     }
