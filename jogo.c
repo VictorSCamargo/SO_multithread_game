@@ -45,7 +45,7 @@ int disparar_missil = 0;
 int municoes_disponiveis = 6;
 int MAX_MUNICOES = 6;
 int y_ultimo_missel = 21;
-const max_naves_destruidas = 20
+const max_naves_destruidas = 20;
 
 HANDLE semaforo_goto;
 HANDLE semaforo_missil_disparado;
