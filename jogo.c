@@ -19,12 +19,14 @@
 // Variavel para alterar dificuldade (que muda a velocidade das naves)
 // Detectar colisao entre nave e missil, apagar ambos objetos e gerar explosao
 
+// BUGS
+// SE APERTAR UMA TECLA 10 VEZES RAPIDAMENTE ELE IRÁ DISPARAR 10 VEZES SEGUIDAS.
 
 int cooldown_respawn_nave_minimo = 2000;
 
 int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
 
-int total_segundos_jogo = 60;
+int total_segundos_jogo = 10;
 int acabou_jogo = 0;    //false
 
 int nave_x;
@@ -40,9 +42,16 @@ int destruir_missil = 0;
 int destruir_nave = 0;
 
 int disparar_missil = 0;
+int municoes_disponiveis = 6;
+int MAX_MUNICOES = 6;
+int y_ultimo_missel = 21;
+const max_naves_destruidas = 20;
 
 HANDLE semaforo_goto;
 HANDLE semaforo_missil_disparado;
+HANDLE hMutex;
+HANDLE hProdutorThread;
+DWORD produtorThreadId;
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -51,7 +60,9 @@ void gotoxy(int x, int y)
   coord.X = x;
   coord.Y = y;
   SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+
 }
+
 void bomba_horizontal(int x, int y){
 	gotoxy(x, y);
 	printf("<");
@@ -182,9 +193,14 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
 
     static const int hitbox_nave_x = 4;
     static const int hitbox_nave_y = 2;
+    static int naves_destruidas = 0;
 
     while (!acabou_jogo){
         Sleep(10); // delay para nao checar tanto
+
+        if (naves_destruidas == max_naves_destruidas){
+            acabou_jogo = 1;
+        }
 
         // se posicao de missil e nave (com hitbox maior) estiverem batendo
         if ((missil_x >= (nave_x - hitbox_nave_x)) &&
@@ -203,9 +219,30 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
             ReleaseSemaphore(semaforo_goto, 1, NULL);
 
             Sleep(cooldown_respawn_nave_minimo);
+
+            naves_destruidas = naves_destruidas + 1;
         }
     }
     ExitThread(0);
+}
+
+DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
+    while (!acabou_jogo) {
+        Sleep(5000); // Delay de 2 segundos entre a produção de mísseis
+
+        if (municoes_disponiveis < MAX_MUNICOES) {
+            WaitForSingleObject(hMutex, INFINITE);
+            municoes_disponiveis++;
+            y_ultimo_missel--;
+            WaitForSingleObject(semaforo_goto, INFINITE);
+            bomba_horizontal(43, y_ultimo_missel);
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
+            ReleaseMutex(hMutex);
+        }
+
+    }
+
+    return 0;
 }
 
 DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
@@ -263,7 +300,7 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
                 destruir_nave = 0;
                 break;
             }
-            
+
             WaitForSingleObject(semaforo_goto, INFINITE);
             nave(nave_x,nave_y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
@@ -283,7 +320,18 @@ DWORD WINAPI interpreta_input(LPVOID lpParameter) {
     while(!acabou_jogo) {
         getche();
         if(disparar_missil == 0){
-            disparar_missil = 1;
+            if (municoes_disponiveis > 0) {
+                disparar_missil = 1;
+                WaitForSingleObject(hMutex, INFINITE);
+                WaitForSingleObject(semaforo_goto, INFINITE);
+                apaga_bomba_horizontal(43,y_ultimo_missel);
+                ReleaseSemaphore(semaforo_goto, 1, NULL);
+                municoes_disponiveis--;
+                y_ultimo_missel++;
+                ReleaseMutex(hMutex);
+
+            }
+
         }
         Sleep(1000);
     }
@@ -299,8 +347,8 @@ int main(){
     system("cls");
 
     // ToDo tirar ao final
-    //printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
-    //scanf("%d", &dificuldade);
+    printf("Selecione a dificuldade [0]facil [1]medio [2]dificil: ");
+    scanf("%d", &dificuldade);
 
     switch(dificuldade){
         case 0:
@@ -339,9 +387,11 @@ int main(){
     HANDLE handle_movimento_nave = CreateThread(NULL, 0, movimento_nave, NULL, 0, NULL);
     HANDLE handle_detecta_colisao = CreateThread(NULL, 0, detecta_colisao, NULL, 0, NULL);
     HANDLE handle_interpreta_input = CreateThread(NULL, 0, interpreta_input, NULL, 0, NULL);
+    HANDLE hProdutorThread = CreateThread(NULL, 0, ProdutorMisseis, NULL, 0, &produtorThreadId);
 
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
+    hMutex = CreateMutex(NULL, FALSE, NULL);
 
     // se falhar a criacao de algo
     if (handle_timer_do_jogo == NULL ||
@@ -349,7 +399,8 @@ int main(){
         handle_movimento_missil == NULL ||
         handle_movimento_nave == NULL ||
         handle_detecta_colisao == NULL ||
-        handle_interpreta_input == NULL
+        handle_interpreta_input == NULL ||
+        hProdutorThread == NULL
         ) {
         return -420;
     }
@@ -359,6 +410,15 @@ int main(){
         if(acabou_jogo) {
             CloseHandle(semaforo_goto);
             CloseHandle(semaforo_missil_disparado);
+            CloseHandle(hProdutorThread);
+            CloseHandle(handle_timer_do_jogo);
+            CloseHandle(handle_movimento_missil);
+            CloseHandle(handle_movimento_nave);
+            CloseHandle(handle_detecta_colisao);
+            CloseHandle(handle_interpreta_input);
+            system("cls");
+            printf("Jogo finalizado!");
+            Sleep(5000);
             return 0;
         }
     }
