@@ -22,6 +22,21 @@
 // BUGS
 // SE APERTAR UMA TECLA 10 VEZES RAPIDAMENTE ELE IRÁ DISPARAR 10 VEZES SEGUIDAS.
 
+typedef struct {
+    int x;
+    int y;
+    int is_alive;
+} NaveModel;
+
+typedef struct {
+    int x;
+    int y;
+    int is_alive;
+} MissilModel;
+
+NaveModel nave_1;
+MissilModel missil_1;
+
 int cooldown_respawn_nave_minimo = 2000;
 
 int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
@@ -29,17 +44,7 @@ int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
 int total_segundos_jogo = 20;
 int acabou_jogo = 0;    //false
 
-int nave_x;
-int nave_y;
-
-int missil_x = 40; // fixo
-int missil_y;
-
 int delay_deslocamento_nave;
-
-// para sinalizar para a thread do missil e nave destruirem ele
-int destruir_missil = 0;
-int destruir_nave = 0;
 
 int disparar_missil = 0;
 int municoes_disponiveis = 6;
@@ -203,16 +208,16 @@ DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
         }
 
         // se posicao de missil e nave (com hitbox maior) estiverem batendo
-        if ((missil_x >= (nave_x - hitbox_nave_x)) &&
-            (missil_x <= (nave_x + hitbox_nave_x)) &&
-            (missil_y >= (nave_y - hitbox_nave_y)) &&
-            (missil_y <= (nave_y + hitbox_nave_y))
+        if ((missil_1.x >= (nave_1.x - hitbox_nave_x)) &&
+            (missil_1.x <= (nave_1.x + hitbox_nave_x)) &&
+            (missil_1.y >= (nave_1.y - hitbox_nave_y)) &&
+            (missil_1.y <= (nave_1.y + hitbox_nave_y))
         ){
-            int posicao_explosao_x = missil_x;
-            int posicao_explosao_y = missil_y;
+            int posicao_explosao_x = missil_1.x;
+            int posicao_explosao_y = missil_1.y;
 
-            destruir_missil = 1;
-            destruir_nave = 1;
+            missil_1.is_alive = 0;
+            nave_1.is_alive = 0;
 
             WaitForSingleObject(semaforo_goto, INFINITE);
             explode_bomba(posicao_explosao_x, posicao_explosao_y);
@@ -266,23 +271,25 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
             Sleep(100);
         }
 
-        for (missil_y = y_inicial_missil; missil_y >=2; missil_y--){
-            if(destruir_missil || acabou_jogo) {
-                destruir_missil = 0;
+        missil_1.is_alive = 1;
+
+        for (missil_1.y = y_inicial_missil; missil_1.y >=2; missil_1.y--){
+            if(!missil_1.is_alive || acabou_jogo) {
                 break;
             }
 
             WaitForSingleObject(semaforo_goto, INFINITE);
-            bomba(missil_x,missil_y);
+            bomba(missil_1.x, missil_1.y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
 
             Sleep(40);
 
             WaitForSingleObject(semaforo_goto, INFINITE);
-            apaga_bomba(missil_x,missil_y);
+            apaga_bomba(missil_1.x, missil_1.y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
-        missil_y = y_inicial_missil;
+        missil_1.is_alive = 0;
+        missil_1.y = y_inicial_missil;
         disparar_missil = 0;
     }
     ExitThread(0);
@@ -295,24 +302,23 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
 
         Sleep(cooldown_respawn_nave_minimo + (rand() % 2000));
 
-        nave_y = 2 + (rand() % 5);
-        for (nave_x = x_inicial_nave; nave_x >=0; nave_x--){
-            if(destruir_nave || acabou_jogo) {
-                destruir_nave = 0;
+        nave_1.y = 2 + (rand() % 5);
+        for (nave_1.x = x_inicial_nave; nave_1.x >=0; nave_1.x--){
+            if(!nave_1.is_alive || acabou_jogo) {
                 break;
             }
 
             WaitForSingleObject(semaforo_goto, INFINITE);
-            nave(nave_x,nave_y);
+            nave(nave_1.x,nave_1.y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
 
             Sleep(delay_deslocamento_nave);
 
             WaitForSingleObject(semaforo_goto, INFINITE);
-            apaga_nave(nave_x,nave_y);
+            apaga_nave(nave_1.x,nave_1.y);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
-        nave_x = x_inicial_nave;
+        nave_1.x = x_inicial_nave;
     }
     ExitThread(0);
 }
@@ -377,6 +383,8 @@ int main(){
     bomba_horizontal(43, 23);
     bomba_horizontal(43, 22);
     bomba_horizontal(43, 21);
+
+    missil_1.x = 40;
 
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
     HANDLE handle_movimento_missil = CreateThread(NULL, 0, movimento_missil, NULL, 0, NULL);
