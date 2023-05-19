@@ -5,10 +5,7 @@
 #include <stdlib.h>
 
 // ToDos
-// Recarregar missil sincronamente caso estoque nao esteja cheio (lembrar de desenhar ele na tela)
-// Apagar missil conforme ele eh utilizado
-// Acabar jogo ao eliminar 20 naves
-// Impedir disparo do missil se n tiver municao
+// Revisar todas variaveis de sessao critica e colocar semaforo ou mutex para cuidar!!!!!!!!
 // (revisar se nao falta algo no moodle)
 
 // Feitos
@@ -18,6 +15,10 @@
 // Timer de tempo maximo do jogo
 // Variavel para alterar dificuldade (que muda a velocidade das naves)
 // Detectar colisao entre nave e missil, apagar ambos objetos e gerar explosao
+// Acabar jogo ao eliminar 20 naves
+// Apagar missil conforme ele eh utilizado
+// Impedir disparo do missil se n tiver municao
+// Recarregar missil sincronamente caso estoque nao esteja cheio (lembrar de desenhar ele na tela)
 
 // BUGS
 // SE APERTAR UMA TECLA 10 VEZES RAPIDAMENTE ELE IRÁ DISPARAR 10 VEZES SEGUIDAS.
@@ -31,32 +32,32 @@ typedef struct {
 typedef struct {
     int x;
     int y;
-    int is_alive;
 } MissilModel;
 
-NaveModel nave_1;
-MissilModel missil_1;
+// defines sao jeitos de definir constantes em nivel de compilacao (compilador interpreta)
+#define NUM_DE_NAVES 5
+#define COOLDOWN_RESPAWN_NAVE 1000
+#define MAX_MUNICOES 6
 
-int cooldown_respawn_nave_minimo = 2000;
+NaveModel naves[NUM_DE_NAVES]; //array de naves
 
-int dificuldade = 0; // 0, 1 ou 2: muda a velocidade da nave
+int total_segundos_jogo = 30; //thread vai decrementar esse valor
 
-int total_segundos_jogo = 20;
-int acabou_jogo = 0;    //false
+int acabou_jogo = 0; // quando deixar de ser zero as threads irao ser finalizadas
 
-int delay_deslocamento_nave;
+int delay_base_deslocamento_nave;
 
-int disparar_missil = 0;
 int municoes_disponiveis = 6;
-int MAX_MUNICOES = 6;
 int y_ultimo_missel = 21;
 const max_naves_destruidas = 20;
+
+int naves_destruidas = 0;
 
 HANDLE semaforo_goto;
 HANDLE semaforo_missil_disparado;
 HANDLE hMutex;
 HANDLE hProdutorThread;
-DWORD produtorThreadId;
+DWORD produtorThreadId; //ToDO descobrir oq significa
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -194,43 +195,6 @@ void criar_montanhas() {
     }
 }
 
-DWORD WINAPI detecta_colisao(LPVOID lpParameter) {
-
-    static const int hitbox_nave_x = 4;
-    static const int hitbox_nave_y = 2;
-    static int naves_destruidas = 0;
-
-    while (!acabou_jogo){
-        Sleep(50); // delay para nao checar tanto
-
-        if (naves_destruidas == max_naves_destruidas){
-            acabou_jogo = 1;
-        }
-
-        // se posicao de missil e nave (com hitbox maior) estiverem batendo
-        if ((missil_1.x >= (nave_1.x - hitbox_nave_x)) &&
-            (missil_1.x <= (nave_1.x + hitbox_nave_x)) &&
-            (missil_1.y >= (nave_1.y - hitbox_nave_y)) &&
-            (missil_1.y <= (nave_1.y + hitbox_nave_y))
-        ){
-            int posicao_explosao_x = missil_1.x;
-            int posicao_explosao_y = missil_1.y;
-
-            missil_1.is_alive = 0;
-            nave_1.is_alive = 0;
-
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            explode_bomba(posicao_explosao_x, posicao_explosao_y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
-
-            Sleep(cooldown_respawn_nave_minimo);
-
-            naves_destruidas = naves_destruidas + 1;
-        }
-    }
-    ExitThread(0);
-}
-
 DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
     while (!acabou_jogo) {
         Sleep(5000); // Delay entre a produção de mísseis
@@ -263,85 +227,169 @@ DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
 }
 
 DWORD WINAPI movimento_missil(LPVOID lpParameter) {
+    static const int x_inicial_missil = 40;
     static const int y_inicial_missil = 20;
 
-    while(!acabou_jogo){
+    static const int hitbox_nave_x = 4;
+    static const int hitbox_nave_y = 2;
 
-        while(disparar_missil == 0){
-            Sleep(100);
+    MissilModel missil;
+    missil.x = x_inicial_missil;
+    missil.y = y_inicial_missil;
+
+    int missil_destruido = 0;
+
+    for (missil.y = y_inicial_missil; missil.y >=2; missil.y--){
+        if(acabou_jogo) {
+            break;
         }
 
-        missil_1.is_alive = 1;
+        // verifica se missil esta colidindo com alguma nave
+        for(int i = 0; i < NUM_DE_NAVES; i++){
+            // se posicao de missil e nave (com hitbox maior) estiverem batendo
+            if ( naves[i].is_alive &&
+                (missil.x >= (naves[i].x - hitbox_nave_x)) &&
+                (missil.x <= (naves[i].x + hitbox_nave_x)) &&
+                (missil.y >= (naves[i].y - hitbox_nave_y)) &&
+                (missil.y <= (naves[i].y + hitbox_nave_y))
+            ){
+                int posicao_explosao_x = missil.x;
+                int posicao_explosao_y = missil.y;
 
-        for (missil_1.y = y_inicial_missil; missil_1.y >=2; missil_1.y--){
-            if(!missil_1.is_alive || acabou_jogo) {
+                //marca para nave se destruir na sua thread 
+                naves[i].is_alive = 0; 
+
+                naves_destruidas += 1; //ToDo sessao critica!
+
+                WaitForSingleObject(semaforo_goto, INFINITE);
+                explode_bomba(posicao_explosao_x, posicao_explosao_y);
+                ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+                missil_destruido = 1; //marca para sair do loop em seguida
+
+                // sai do loop
                 break;
             }
-
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            bomba(missil_1.x, missil_1.y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
-
-            Sleep(40);
-
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            apaga_bomba(missil_1.x, missil_1.y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
-        missil_1.is_alive = 0;
-        missil_1.y = y_inicial_missil;
-        disparar_missil = 0;
+
+        if(missil_destruido){
+            break; // sai do loop
+        }
+
+        WaitForSingleObject(semaforo_goto, INFINITE);
+        bomba(missil.x, missil.y);
+        ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+        Sleep(40);
+
+        WaitForSingleObject(semaforo_goto, INFINITE);
+        apaga_bomba(missil.x, missil.y);
+        ReleaseSemaphore(semaforo_goto, 1, NULL);
     }
     ExitThread(0);
 }
 
 DWORD WINAPI movimento_nave(LPVOID lpParameter) {
+
+    // interpreta dados do ponteiro recebido como do tipo NaveModel
+    NaveModel* nave_model = (NaveModel*)lpParameter;
+
+    // deixa a velocidade da nave levemente aleatoria baseado na dificuldade
+    int velocidade_nave = delay_base_deslocamento_nave - 3 + (rand() % 7);
+
+    // enquanto nave nao chegou no fim da tela
+    while (nave_model->x >= 0){
+
+        // encerra precoce se nave foi morta por missil ou acabou jogo
+        if(!nave_model->is_alive || acabou_jogo) {
+            break;
+        }
+
+        WaitForSingleObject(semaforo_goto, INFINITE);
+        nave(nave_model->x,nave_model->y);
+        ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+        Sleep(velocidade_nave);
+
+        WaitForSingleObject(semaforo_goto, INFINITE);
+        apaga_nave(nave_model->x, nave_model->y);
+        ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+        nave_model->x--;
+    }
+
+    ExitThread(0);
+}
+
+DWORD WINAPI spawner_nave(LPVOID lpParameter) {
+
     static const int x_inicial_nave = 79;
 
+    // inicia naves com valor zerado
+    for(int i = 0; i < NUM_DE_NAVES; i++) {
+        naves[i].x = 0;
+        naves[i].y = 0;
+        naves[i].is_alive = 0;
+    }
+
     while(!acabou_jogo){
+        // cooldown pra respawnar nave
+        Sleep(COOLDOWN_RESPAWN_NAVE + (rand() % 1000));
 
-        Sleep(cooldown_respawn_nave_minimo + (rand() % 2000));
+        // busca por alguma nave morta para spawnar
+        for(int i = 0; i < NUM_DE_NAVES; i++) {
+            if(!naves[i].is_alive){
 
-        nave_1.y = 2 + (rand() % 5);
-        for (nave_1.x = x_inicial_nave; nave_1.x >=0; nave_1.x--){
-            if(!nave_1.is_alive || acabou_jogo) {
-                break;
+                // inicia dados da nave que vai spawnar
+                naves[i].x = x_inicial_nave;
+                naves[i].y = 2 + (rand() % 5);
+                naves[i].is_alive = 1;
+
+                // tenta criar thread da nave e passa endereco da nave. Se falhar printa.
+                if(!CreateThread(NULL, 0, movimento_nave, &naves[i], 0, NULL)) {
+                    WaitForSingleObject(semaforo_goto, INFINITE);
+                    gotoxy(0, 0);
+                    printf("Nao criou nave");
+                    ReleaseSemaphore(semaforo_goto, 1, NULL);
+                }
+
+                break; //sai do for e entra em cooldown de respawn dnv
             }
-
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            nave(nave_1.x,nave_1.y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
-
-            Sleep(delay_deslocamento_nave);
-
-            WaitForSingleObject(semaforo_goto, INFINITE);
-            apaga_nave(nave_1.x,nave_1.y);
-            ReleaseSemaphore(semaforo_goto, 1, NULL);
         }
-        nave_1.x = x_inicial_nave;
     }
     ExitThread(0);
 }
 
+//ToDo descobrir como corrigir bug de apertar pra disparar duas vezes mesmo em cooldown
 DWORD WINAPI interpreta_input(LPVOID lpParameter) {
     char ch;
 
     while(!acabou_jogo) {
         ch = getch(); // pega caractere sem imprimir na tela
 
-        if((disparar_missil == 0) && (ch == ' ')){
+        // se apertou espaco
+        if(ch == ' '){
             if (municoes_disponiveis > 0) {
-                disparar_missil = 1;
                 WaitForSingleObject(hMutex, INFINITE);
+
                 WaitForSingleObject(semaforo_goto, INFINITE);
                 apaga_bomba_horizontal(43,y_ultimo_missel);
                 ReleaseSemaphore(semaforo_goto, 1, NULL);
+
                 municoes_disponiveis--;
                 y_ultimo_missel++;
                 ReleaseMutex(hMutex);
+
+                // tenta criar thread do missil. Se falhar printa.
+                if(!CreateThread(NULL, 0, movimento_missil, NULL, 0, NULL)) {
+                    WaitForSingleObject(semaforo_goto, INFINITE);
+                    gotoxy(0, 0);
+                    printf("Nao criou missil");
+                    ReleaseSemaphore(semaforo_goto, 1, NULL);
+                }
             }
         }
-        Sleep(1000);
+        Sleep(300); // cooldown minimo entre disparos
     }
     ExitThread(0);
 }
@@ -355,27 +403,27 @@ int main(){
 
     switch(ch){
         case '0':
-            delay_deslocamento_nave = 50;
+            delay_base_deslocamento_nave = 50;
             break;
         case '1':
-            delay_deslocamento_nave = 30;
+            delay_base_deslocamento_nave = 30;
             break;
         case '2':
-            delay_deslocamento_nave = 15;
+            delay_base_deslocamento_nave = 15;
             break;
         default:
             printf("\nValor nao reconhecido. Setando dificuldade 'medio'...");
-            Sleep(2500);
-            delay_deslocamento_nave = 30;
+            Sleep(2000);
+            delay_base_deslocamento_nave = 30;
             break;
     }
     system("cls"); //clear screen
 
-    criar_montanhas();
-
   	// Providing a seed value
     srand(time(NULL));
 
+    // cria desenhos iniciais da tela
+    criar_montanhas();
     canhao(40, 23);
     bomba_horizontal(43, 26);
     bomba_horizontal(43, 25);
@@ -384,25 +432,23 @@ int main(){
     bomba_horizontal(43, 22);
     bomba_horizontal(43, 21);
 
-    missil_1.x = 40;
-
+    // cria threads
+    //ToDo entender +- o que cada parametro da funcao significa
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
-    HANDLE handle_movimento_missil = CreateThread(NULL, 0, movimento_missil, NULL, 0, NULL);
-    HANDLE handle_movimento_nave = CreateThread(NULL, 0, movimento_nave, NULL, 0, NULL);
-    HANDLE handle_detecta_colisao = CreateThread(NULL, 0, detecta_colisao, NULL, 0, NULL);
     HANDLE handle_interpreta_input = CreateThread(NULL, 0, interpreta_input, NULL, 0, NULL);
+    HANDLE handle_spawner_nave = CreateThread(NULL, 0, spawner_nave, NULL, 0, NULL);
     HANDLE hProdutorThread = CreateThread(NULL, 0, ProdutorMisseis, NULL, 0, &produtorThreadId);
 
+    // cria mecanismos de sinalizacao
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
     hMutex = CreateMutex(NULL, FALSE, NULL);
 
     // se falhar a criacao de algo
+    // ToDo colocar a criacao dos mecanismos de sinalizacao tbm aqui?
     if (handle_timer_do_jogo == NULL ||
         semaforo_goto == NULL ||
-        handle_movimento_missil == NULL ||
-        handle_movimento_nave == NULL ||
-        handle_detecta_colisao == NULL ||
+        handle_spawner_nave == NULL ||
         handle_interpreta_input == NULL ||
         hProdutorThread == NULL
         ) {
@@ -411,15 +457,19 @@ int main(){
 
 	while(1){
         Sleep(100); // para nao consumir tanto processador
+
+        // verifica condicao para acabar jogo
+        if (naves_destruidas >= max_naves_destruidas){
+            acabou_jogo = 1;
+        }
+
         if(acabou_jogo) {
             // fecha os handles
             CloseHandle(semaforo_goto);
             CloseHandle(semaforo_missil_disparado);
             CloseHandle(hProdutorThread);
             CloseHandle(handle_timer_do_jogo);
-            CloseHandle(handle_movimento_missil);
-            CloseHandle(handle_movimento_nave);
-            CloseHandle(handle_detecta_colisao);
+            CloseHandle(handle_spawner_nave);
             CloseHandle(handle_interpreta_input);
 
             Sleep(100); // margem para esperar o resto dos processos pararem
