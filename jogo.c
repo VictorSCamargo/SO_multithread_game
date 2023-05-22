@@ -27,6 +27,7 @@ typedef struct {
     int x;
     int y;
     int is_alive;
+    int was_hit;
 } NaveModel;
 
 typedef struct {
@@ -54,10 +55,14 @@ const max_naves_destruidas = 20;
 int naves_destruidas = 0;
 
 HANDLE semaforo_goto;
+HANDLE semaforo_coord_explosao;
+
 HANDLE semaforo_missil_disparado;
 HANDLE hMutex;
 HANDLE hProdutorThread;
 DWORD produtorThreadId; //ToDO descobrir oq significa
+
+COORD coord_explosao;
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -98,39 +103,9 @@ void apaga_bomba(int x, int y){
 	printf("    ");
 }
 void explode_bomba(int x, int y){
-	gotoxy(x, y);
-	printf("*");
-	Sleep(50);
-	printf(" ");
-	gotoxy(x, y-1);
-	printf("O");
-	gotoxy(x-1, y);
-	printf("O O");
-	gotoxy(x, y+1);
-	printf("O");
-	Sleep(50);
-	gotoxy(x, y-1);
-	printf(" ");
-	gotoxy(x-1, y);
-	printf("   ");
-	gotoxy(x, y+1);
-	printf(" ");
 
-
-	gotoxy(x, y-2);
-	printf("o");
-	gotoxy(x-2, y);
-	printf("o   o");
-	gotoxy(x, y+2);
-	printf("o");
-	Sleep(50);
-	gotoxy(x, y-2);
-	printf(" ");
-	gotoxy(x-2, y);
-	printf("     ");
-	gotoxy(x, y+2);
-	printf(" ");
 }
+
 void nave(int x, int y){
 	gotoxy(x, y);
 	printf("/");
@@ -226,6 +201,62 @@ DWORD WINAPI timer_do_jogo(LPVOID lpParameter) {
     ExitThread(0);
 }
 
+DWORD WINAPI desenha_explosao(LPVOID lpParameter) {
+
+    COORD coord;
+    coord.X = coord_explosao.X;
+    coord.Y = coord_explosao.Y;
+
+    ReleaseSemaphore(semaforo_coord_explosao, 1, NULL);
+
+    WaitForSingleObject(semaforo_goto, INFINITE);
+	gotoxy(coord.X, coord.Y);
+	printf("*");
+    ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+	Sleep(50);
+
+    WaitForSingleObject(semaforo_goto, INFINITE);
+	printf(" ");
+	gotoxy(coord.X, coord.Y-1);
+	printf("O");
+	gotoxy(coord.X-1, coord.Y);
+	printf("O O");
+	gotoxy(coord.X, coord.Y+1);
+	printf("O");
+    ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+	Sleep(50);
+
+    WaitForSingleObject(semaforo_goto, INFINITE);
+	gotoxy(coord.X, coord.Y-1);
+	printf(" ");
+	gotoxy(coord.X-1, coord.Y);
+	printf("   ");
+	gotoxy(coord.X, coord.Y+1);
+	printf(" ");
+	gotoxy(coord.X, coord.Y-2);
+	printf("o");
+	gotoxy(coord.X-2, coord.Y);
+	printf("o   o");
+	gotoxy(coord.X, coord.Y+2);
+	printf("o");
+    ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+	Sleep(50);
+
+    WaitForSingleObject(semaforo_goto, INFINITE);
+	gotoxy(coord.X, coord.Y-2);
+	printf(" ");
+	gotoxy(coord.X-2, coord.Y);
+	printf("     ");
+	gotoxy(coord.X, coord.Y+2);
+	printf(" ");
+    ReleaseSemaphore(semaforo_goto, 1, NULL);
+
+    ExitThread(0);
+}
+
 DWORD WINAPI movimento_missil(LPVOID lpParameter) {
     static const int x_inicial_missil = 40;
     static const int y_inicial_missil = 20;
@@ -253,17 +284,22 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
                 (missil.y >= (naves[i].y - hitbox_nave_y)) &&
                 (missil.y <= (naves[i].y + hitbox_nave_y))
             ){
-                int posicao_explosao_x = missil.x;
-                int posicao_explosao_y = missil.y;
-
                 //marca para nave se destruir na sua thread 
-                naves[i].is_alive = 0; 
+                naves[i].was_hit = 1; 
 
                 naves_destruidas += 1; //ToDo sessao critica!
 
-                WaitForSingleObject(semaforo_goto, INFINITE);
-                explode_bomba(posicao_explosao_x, posicao_explosao_y);
-                ReleaseSemaphore(semaforo_goto, 1, NULL);
+                WaitForSingleObject(semaforo_coord_explosao, INFINITE);
+                coord_explosao.X = missil.x;
+                coord_explosao.Y = missil.y;
+
+                // tenta criar thread. Se falhar printa.
+                if(!CreateThread(NULL, 0, desenha_explosao, &coord_explosao, 0, NULL)) {
+                    WaitForSingleObject(semaforo_goto, INFINITE);
+                    gotoxy(0, 0);
+                    printf("Nao criou explosao");
+                    ReleaseSemaphore(semaforo_goto, 1, NULL);
+                }
 
                 missil_destruido = 1; //marca para sair do loop em seguida
 
@@ -301,7 +337,8 @@ DWORD WINAPI movimento_nave(LPVOID lpParameter) {
     while (nave_model->x >= 0){
 
         // encerra precoce se nave foi morta por missil ou acabou jogo
-        if(!nave_model->is_alive || acabou_jogo) {
+        if(nave_model->was_hit || acabou_jogo) {
+            nave_model->is_alive = 0; // marca como morta para poder ser spawnada novamente
             break;
         }
 
@@ -330,6 +367,7 @@ DWORD WINAPI spawner_nave(LPVOID lpParameter) {
         naves[i].x = 0;
         naves[i].y = 0;
         naves[i].is_alive = 0;
+        naves[i].was_hit = 0;
     }
 
     while(!acabou_jogo){
@@ -344,6 +382,7 @@ DWORD WINAPI spawner_nave(LPVOID lpParameter) {
                 naves[i].x = x_inicial_nave;
                 naves[i].y = 2 + (rand() % 5);
                 naves[i].is_alive = 1;
+                naves[i].was_hit = 0;
 
                 // tenta criar thread da nave e passa endereco da nave. Se falhar printa.
                 if(!CreateThread(NULL, 0, movimento_nave, &naves[i], 0, NULL)) {
@@ -441,6 +480,7 @@ int main(){
 
     // cria mecanismos de sinalizacao
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
+    semaforo_coord_explosao = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
     hMutex = CreateMutex(NULL, FALSE, NULL);
 
@@ -466,6 +506,7 @@ int main(){
         if(acabou_jogo) {
             // fecha os handles
             CloseHandle(semaforo_goto);
+            CloseHandle(semaforo_coord_explosao);
             CloseHandle(semaforo_missil_disparado);
             CloseHandle(hProdutorThread);
             CloseHandle(handle_timer_do_jogo);
