@@ -60,6 +60,7 @@ int naves_destruidas = 0;
 
 HANDLE semaforo_goto;
 HANDLE semaforo_coord_explosao;
+HANDLE semaforo_naves_destruidas;
 
 HANDLE semaforo_missil_disparado;
 HANDLE hMutex;
@@ -287,9 +288,11 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
                 //marca para nave se destruir na sua thread 
                 naves[i].was_hit = 1; 
 
-                naves_destruidas += 1; //ToDo sessao critica!
+                WaitForSingleObject(semaforo_naves_destruidas, INFINITE);
+                naves_destruidas += 1;
+                ReleaseSemaphore(semaforo_naves_destruidas, 1, NULL);
 
-                WaitForSingleObject(semaforo_coord_explosao, INFINITE);
+                WaitForSingleObject(semaforo_coord_explosao, INFINITE); // deve ser liberado na thread de desenhar explosao
                 coord_explosao.X = missil.x;
                 coord_explosao.Y = missil.y;
 
@@ -472,7 +475,6 @@ int main(){
     bomba_horizontal(43, 21);
 
     // cria threads
-    //ToDo entender +- o que cada parametro da funcao significa
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
     HANDLE handle_interpreta_input = CreateThread(NULL, 0, interpreta_input, NULL, 0, NULL);
     HANDLE handle_spawner_nave = CreateThread(NULL, 0, spawner_nave, NULL, 0, NULL);
@@ -481,15 +483,19 @@ int main(){
     // cria mecanismos de sinalizacao
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_coord_explosao = CreateSemaphore(NULL, 1, 1, NULL);
+    semaforo_naves_destruidas = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
     hMutex = CreateMutex(NULL, FALSE, NULL);
 
     // se falhar a criacao de algo
-    // ToDo colocar a criacao dos mecanismos de sinalizacao tbm aqui?
     if (handle_timer_do_jogo == NULL ||
-        semaforo_goto == NULL ||
         handle_spawner_nave == NULL ||
         handle_interpreta_input == NULL ||
+        semaforo_goto == NULL ||
+        semaforo_coord_explosao == NULL ||
+        semaforo_naves_destruidas == NULL ||
+        semaforo_missil_disparado == NULL ||
+        hMutex == NULL ||
         hProdutorThread == NULL
         ) {
         return -420;
@@ -511,6 +517,7 @@ int main(){
             CloseHandle(handle_timer_do_jogo);
             CloseHandle(handle_spawner_nave);
             CloseHandle(handle_interpreta_input);
+            CloseHandle(semaforo_naves_destruidas);
 
             Sleep(1000); // margem para esperar o resto dos processos pararem
 
