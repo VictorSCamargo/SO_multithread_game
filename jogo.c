@@ -41,7 +41,7 @@ typedef struct {
 #define MAX_MUNICOES 6
 #define DELAY_PRODUCAO_MISSIL 3000
 
-NaveModel naves[NUM_DE_NAVES]; //array de naves
+NaveModel naves[NUM_DE_NAVES]; //array de naves (maximo de naves vivas simultaneamente)
 COORD coord_explosao;
 
 // Nao critico: editado apenas em uma thread
@@ -174,8 +174,6 @@ void criar_montanhas() {
 
 DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
     while (!acabou_jogo) {
-        Sleep(DELAY_PRODUCAO_MISSIL); // Delay entre a produção de mísseis
-
         if (municoes_disponiveis < MAX_MUNICOES) {
             WaitForSingleObject(hMutex, INFINITE);
             municoes_disponiveis++;
@@ -185,7 +183,7 @@ DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
             ReleaseSemaphore(semaforo_goto, 1, NULL);
             ReleaseMutex(hMutex);
         }
-
+        Sleep(DELAY_PRODUCAO_MISSIL); // Delay entre a produção de mísseis
     }
     ExitThread(0);
 }
@@ -506,8 +504,7 @@ int main(){
         }
 
         if(acabou_jogo) {
-            // fecha os handles
-            CloseHandle(semaforo_goto);
+            // fecha os handles 
             CloseHandle(semaforo_coord_explosao);
             CloseHandle(semaforo_missil_disparado);
             CloseHandle(hProdutorThread);
@@ -515,13 +512,18 @@ int main(){
             CloseHandle(handle_spawner_nave);
             CloseHandle(handle_interpreta_input);
 
-            Sleep(100); // margem para esperar o resto dos processos pararem
+            Sleep(1000); // margem para esperar o resto dos processos pararem
 
             // imprimir jogo finalizado
+            WaitForSingleObject(semaforo_goto, INFINITE);
             system("cls");
             gotoxy(0, 0);
             printf("Jogo finalizado!");
+            ReleaseSemaphore(semaforo_goto, 1, NULL);
+
             Sleep(5000);
+
+            CloseHandle(semaforo_goto);
 
             return 0;
         }
