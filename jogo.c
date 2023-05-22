@@ -63,7 +63,7 @@ HANDLE semaforo_coord_explosao;
 HANDLE semaforo_naves_destruidas;
 
 HANDLE semaforo_missil_disparado;
-HANDLE hMutex;
+HANDLE mutex_municoes_disponiveis;
 HANDLE hProdutorThread;
 DWORD produtorThreadId; //ToDO descobrir oq significa
 
@@ -176,13 +176,13 @@ void criar_montanhas() {
 DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
     while (!acabou_jogo) {
         if (municoes_disponiveis < MAX_MUNICOES) {
-            WaitForSingleObject(hMutex, INFINITE);
+            WaitForSingleObject(mutex_municoes_disponiveis, INFINITE);
             municoes_disponiveis++;
             y_ultimo_missel--;
             WaitForSingleObject(semaforo_goto, INFINITE);
             bomba_horizontal(43, y_ultimo_missel);
             ReleaseSemaphore(semaforo_goto, 1, NULL);
-            ReleaseMutex(hMutex);
+            ReleaseMutex(mutex_municoes_disponiveis);
         }
         Sleep(DELAY_PRODUCAO_MISSIL); // Delay entre a produção de mísseis
     }
@@ -412,7 +412,7 @@ DWORD WINAPI interpreta_input(LPVOID lpParameter) {
         // se apertou espaco
         if(ch == ' '){
             if (municoes_disponiveis > 0) {
-                WaitForSingleObject(hMutex, INFINITE);
+                WaitForSingleObject(mutex_municoes_disponiveis, INFINITE);
 
                 WaitForSingleObject(semaforo_goto, INFINITE);
                 apaga_bomba_horizontal(43,y_ultimo_missel);
@@ -420,7 +420,7 @@ DWORD WINAPI interpreta_input(LPVOID lpParameter) {
 
                 municoes_disponiveis--;
                 y_ultimo_missel++;
-                ReleaseMutex(hMutex);
+                ReleaseMutex(mutex_municoes_disponiveis);
 
                 // tenta criar thread do missil. Se falhar printa.
                 if(!CreateThread(NULL, 0, movimento_missil, NULL, 0, NULL)) {
@@ -485,7 +485,7 @@ int main(){
     semaforo_coord_explosao = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_naves_destruidas = CreateSemaphore(NULL, 1, 1, NULL);
     semaforo_missil_disparado = CreateSemaphore(NULL, 1, 1, NULL);
-    hMutex = CreateMutex(NULL, FALSE, NULL);
+    mutex_municoes_disponiveis = CreateMutex(NULL, FALSE, NULL);
 
     // se falhar a criacao de algo
     if (handle_timer_do_jogo == NULL ||
@@ -495,7 +495,7 @@ int main(){
         semaforo_coord_explosao == NULL ||
         semaforo_naves_destruidas == NULL ||
         semaforo_missil_disparado == NULL ||
-        hMutex == NULL ||
+        mutex_municoes_disponiveis == NULL ||
         hProdutorThread == NULL
         ) {
         return -420;
