@@ -39,18 +39,22 @@ typedef struct {
 #define NUM_DE_NAVES 5
 #define COOLDOWN_RESPAWN_NAVE 1000
 #define MAX_MUNICOES 6
+#define DELAY_PRODUCAO_MISSIL 3000
 
 NaveModel naves[NUM_DE_NAVES]; //array de naves
+COORD coord_explosao;
 
+// Nao critico: editado apenas em uma thread
 int total_segundos_jogo = 30; //thread vai decrementar esse valor
 
+// Soh eh mudado para 1 e acaba jogo
 int acabou_jogo = 0; // quando deixar de ser zero as threads irao ser finalizadas
 
+// Definida ao escolher dificuldade
 int delay_base_deslocamento_nave;
 
 int municoes_disponiveis = 6;
 int y_ultimo_missel = 21;
-const max_naves_destruidas = 20;
 
 int naves_destruidas = 0;
 
@@ -61,8 +65,6 @@ HANDLE semaforo_missil_disparado;
 HANDLE hMutex;
 HANDLE hProdutorThread;
 DWORD produtorThreadId; //ToDO descobrir oq significa
-
-COORD coord_explosao;
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -172,7 +174,7 @@ void criar_montanhas() {
 
 DWORD WINAPI ProdutorMisseis(LPVOID lpParam) {
     while (!acabou_jogo) {
-        Sleep(5000); // Delay entre a produção de mísseis
+        Sleep(DELAY_PRODUCAO_MISSIL); // Delay entre a produção de mísseis
 
         if (municoes_disponiveis < MAX_MUNICOES) {
             WaitForSingleObject(hMutex, INFINITE);
@@ -499,7 +501,7 @@ int main(){
         Sleep(100); // para nao consumir tanto processador
 
         // verifica condicao para acabar jogo
-        if (naves_destruidas >= max_naves_destruidas){
+        if (naves_destruidas >= NUM_DE_NAVES){
             acabou_jogo = 1;
         }
 
