@@ -17,8 +17,8 @@ typedef struct {
 } MissilModel;
 
 // defines sao jeitos de definir constantes em nivel de compilacao (compilador interpreta)
-#define NUM_DE_NAVES 3
-#define TEMPO_MAXIMO_JOGO 3
+#define NUM_DE_NAVES 20
+#define TEMPO_MAXIMO_JOGO 60
 #define COOLDOWN_RESPAWN_NAVE 1000
 #define MAX_MUNICOES 6
 #define DELAY_PRODUCAO_MISSIL 2000
