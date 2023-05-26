@@ -46,8 +46,7 @@ HANDLE semaforo_naves_destruidas;
 
 HANDLE semaforo_missil_disparado;
 HANDLE mutex_municoes_disponiveis;
-HANDLE hProdutorThread;
-DWORD produtorThreadId;
+HANDLE handle_produtor;
 
 //Fun��o gotoxy
 void gotoxy(int x, int y)
@@ -288,6 +287,10 @@ DWORD WINAPI movimento_missil(LPVOID lpParameter) {
 
                 missil_destruido = 1; //marca para sair do loop em seguida
 
+                if (naves_destruidas >= NUM_DE_NAVES){
+                    acabou_jogo = 1;
+                }
+
                 // sai do loop
                 break;
             }
@@ -459,7 +462,7 @@ int main(){
     HANDLE handle_timer_do_jogo = CreateThread(NULL, 0, timer_do_jogo, NULL, 0, NULL);
     HANDLE handle_interpreta_input = CreateThread(NULL, 0, interpreta_input, NULL, 0, NULL);
     HANDLE handle_spawner_nave = CreateThread(NULL, 0, spawner_nave, NULL, 0, NULL);
-    HANDLE hProdutorThread = CreateThread(NULL, 0, ProdutorMisseis, NULL, 0, &produtorThreadId);
+    HANDLE handle_produtor = CreateThread(NULL, 0, ProdutorMisseis, NULL, 0, NULL);
 
     // cria mecanismos de sinalizacao
     semaforo_goto = CreateSemaphore(NULL, 1, 1, NULL);
@@ -477,40 +480,30 @@ int main(){
         semaforo_naves_destruidas == NULL ||
         semaforo_missil_disparado == NULL ||
         mutex_municoes_disponiveis == NULL ||
-        hProdutorThread == NULL
+        handle_produtor == NULL
         ) {
         acabou_jogo = 1;
-        return -420;
+        return -1;
     }
 
 	while(1){
-        Sleep(100); // para nao consumir tanto processador
-
-        // verifica condicao para acabar jogo
-        if (naves_destruidas >= NUM_DE_NAVES){
-            acabou_jogo = 1;
-        }
+        // espera processos acabarem, exceto o que trata input pois ele fica bloqueado por causa da espera de input
+        WaitForSingleObject(handle_timer_do_jogo, INFINITE);
+        WaitForSingleObject(handle_spawner_nave, INFINITE);
+        WaitForSingleObject(handle_produtor, INFINITE);
 
         if(acabou_jogo) {
-            // WaitForSingleObject(handle_timer_do_jogo, INFINITE);
-            // WaitForSingleObject(handle_interpreta_input, INFINITE);
-            // WaitForSingleObject(handle_spawner_nave, INFINITE);
-            // WaitForSingleObject(hProdutorThread, INFINITE);
-
             // fecha os handles dos dispositivos de sincronizacao
-            CloseHandle(semaforo_goto);
             CloseHandle(semaforo_coord_explosao);
             CloseHandle(mutex_municoes_disponiveis);
             CloseHandle(semaforo_missil_disparado);
             CloseHandle(semaforo_naves_destruidas);
 
             // fecha os handles das threads
-            CloseHandle(hProdutorThread);
+            CloseHandle(handle_produtor);
             CloseHandle(handle_timer_do_jogo);
             CloseHandle(handle_spawner_nave);
             CloseHandle(handle_interpreta_input);
-
-            Sleep(1000); // margem para esperar o resto dos processos pararem
 
             // imprimir jogo finalizado
             WaitForSingleObject(semaforo_goto, INFINITE);
@@ -519,8 +512,9 @@ int main(){
             printf("Jogo finalizado!");
             ReleaseSemaphore(semaforo_goto, 1, NULL);
 
-            Sleep(5000);
+            Sleep(3000);
 
+            // finalizar handle final
             CloseHandle(semaforo_goto);
 
             return 0;
